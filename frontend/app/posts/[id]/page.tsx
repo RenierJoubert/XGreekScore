@@ -12,19 +12,22 @@ interface Post {
   date: string;
   content: string;
   reply_count: number;
+  deleted: number;
   replies: Reply[];
 }
 
 async function getPost(id: string): Promise<Post | null> {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000"}/api/posts/${id}`, {
-    cache: "no-store",
-  });
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000"}/api/posts/${id}`,
+    { cache: "no-store" }
+  );
   if (!res.ok) return null;
   return res.json();
 }
 
-export default async function PostPage({ params }: { params: { id: string } }) {
-  const post = await getPost(params.id);
+export default async function PostPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const post = await getPost(id);
 
   if (!post) {
     return (
@@ -36,21 +39,32 @@ export default async function PostPage({ params }: { params: { id: string } }) {
 
   return (
     <main className="max-w-3xl mx-auto px-4 py-10">
-      <a href="/" className="text-sm text-blue-500 hover:underline mb-6 block">
+      <a href="/" className="text-sm --tertiary hover:underline mb-6 block">
         ← Back to posts
       </a>
 
-      {/* Post */}
-      <h1 className="text-2xl font-bold mb-2">{post.title}</h1>
+      <div className="flex items-center gap-3 mb-2">
+        <h1 className="text-2xl font-bold">{post.title}</h1>
+        {post.deleted === 1 && (
+          <span className="text-xs font-bold text-black bg-red-500 px-2 py-1 rounded">
+            DELETED
+          </span>
+        )}
+      </div>
+
       <p className="text-sm text-gray-500 mb-6">
         {post.date} ·{" "}
-        <a href={post.link} target="_blank" rel="noopener noreferrer" className="hover:underline">
-          View original
-        </a>
+        {post.deleted === 1 ? (
+          <span className="text-red-400">Original post deleted from GreekRank</span>
+        ) : (
+          <a href={post.link} target="_blank" rel="noopener noreferrer" className="hover:underline">
+            View original
+          </a>
+        )}
       </p>
+
       <div className="prose max-w-none mb-10 whitespace-pre-wrap">{post.content}</div>
 
-      {/* Replies */}
       {post.replies.length > 0 && (
         <>
           <h2 className="text-lg font-semibold mb-4">
