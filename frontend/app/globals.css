@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+:root {
+  --light:     #09090a;
+  --gray:      #888784;
+  --darkgray:  #6b6a65;
+  --dark:      #b0afa8;
+  --secondary: #b0afa8;
+  --tertiary:  #e8e8e6;
+  --highlight: #6b6a65;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  background-color: var(--light);
+  color: var(--tertiary);
+  font-family: var(--font-jetbrains-mono), monospace;
+}
+
+::selection {
+  background: var(--gray);
+  color: var(--light);
+}
+
+input, button {
+  font-family: var(--font-jetbrains-mono), monospace;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--light);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--darkgray);
+  border-radius: 3px;
+}
