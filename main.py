@@ -3,12 +3,12 @@ import argparse
 
 from scraper import scrape_discussions
 
-DEFAULT_PAGES = 451
-DEFAULT_DB = "greekrank.db"
+DEFAULT_PAGES = 500
+DEFAULT_DB = ""
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Scrape GreekRank discussions into SQLite.")
+    parser = argparse.ArgumentParser(description="Scrape into SQLite.")
     parser.add_argument(
         "--pages",
         type=int,

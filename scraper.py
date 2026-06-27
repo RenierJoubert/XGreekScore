@@ -6,9 +6,8 @@ from playwright.async_api import async_playwright, TimeoutError as PWTimeout
 from utils import get_text, get_attr
 from db import init_db, insert_post, insert_reply
 
-BASE_URL = "https://www.greekrank.net/uni/489/discussion/"
+BASE_URL = ""
 
-# How many posts to scrape simultaneously — raise to 10 if you want more speed
 CONCURRENCY = 5
 
 
@@ -33,7 +32,7 @@ async def scrape_post_page(browser, link: str) -> tuple[str, str, list[dict]]:
     except PWTimeout:
         pass
 
-    # Original post is the first .discussion-box on the page
+    # Original post is the first discussion-box on the page
     first_box = await page.query_selector("div.discussion-box.clearfix")
 
     content = "No content"
@@ -119,7 +118,7 @@ async def scrape_discussions(pages: int, db_path: str) -> None:
                 title = await get_text(a) if a else "No Title"
                 link = await get_attr(a, "href") if a else ""
                 if link and not link.startswith("http"):
-                    link = "https://www.greekrank.net" + link
+                    link = "" + link
                 if not link:
                     continue
                 tasks.append(scrape_and_save(sem, browser, conn, title, link, idx))
