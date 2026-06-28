@@ -8,7 +8,7 @@ DEFAULT_DB = "greekrank.db"
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Scrape into SQLite.")
+    parser = argparse.ArgumentParser(description="Scrape GreekRank discussions into SQLite.")
     parser.add_argument(
         "--pages",
         type=int,
@@ -21,13 +21,18 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_DB,
         help=f"Path to the SQLite database file (default: {DEFAULT_DB})",
     )
+    parser.add_argument(
+        "--sweep",
+        action="store_true",
+        help="After scraping, mark posts absent from the listing as deleted. Only reliable on a full scrape.",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    print(f"Starting scrape — pages: {args.pages}, db: {args.db}")
-    asyncio.run(scrape_discussions(pages=args.pages, db_path=args.db))
+    print(f"Starting scrape — pages: {args.pages}, db: {args.db}, sweep: {args.sweep}")
+    asyncio.run(scrape_discussions(pages=args.pages, db_path=args.db, sweep=args.sweep))
 
 
 if __name__ == "__main__":

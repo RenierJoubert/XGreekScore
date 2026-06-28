@@ -90,7 +90,7 @@ async def scrape_and_save(sem, browser, conn, title, link, idx):
         print(f"  [{idx}] saved (post_id={post_id}, {len(replies)} replies)")
 
 
-async def scrape_discussions(pages: int, db_path: str) -> None:
+async def scrape_discussions(pages: int, db_path: str, sweep: bool = False) -> None:
     conn = init_db(db_path)
     sem = asyncio.Semaphore(CONCURRENCY)
     found_links: set[str] = set()
@@ -130,9 +130,12 @@ async def scrape_discussions(pages: int, db_path: str) -> None:
 
         await browser.close()
 
-    print(f"\n[Deletion sweep] {len(found_links)} links seen across {pages} pages")
-    newly_deleted, restored = mark_deleted_posts(conn, found_links)
-    print(f"  {newly_deleted} newly marked deleted, {restored} restored")
+    if sweep:
+        print(f"\n[Deletion sweep] {len(found_links)} links seen across {pages} pages")
+        newly_deleted, restored = mark_deleted_posts(conn, found_links)
+        print(f"  {newly_deleted} newly marked deleted, {restored} restored")
+    else:
+        print(f"\n[Deletion sweep] skipped (run with --sweep on a full scrape)")
 
     conn.close()
     print(f"\nDone. Data saved to {db_path}")
