@@ -13,6 +13,8 @@ interface Post {
   content: string;
   reply_count: number;
   deleted: number;
+  cluster_id: number;
+  cluster_hash: string | null;
   replies: Reply[];
 }
 
@@ -45,6 +47,11 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
 
       <div className="flex items-center gap-3 mb-2">
         <h1 className="text-2xl font-bold">{post.title}</h1>
+        {post.cluster_id >= 0 && (
+          <span className="text-xs font-bold text-black bg-orange-500 px-2 py-1 rounded">
+            REGULAR
+          </span>
+        )}
         {post.deleted === 1 && (
           <span className="text-xs font-bold text-black bg-red-500 px-2 py-1 rounded">
             DELETED
@@ -60,6 +67,18 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
           <a href={post.link} target="_blank" rel="noopener noreferrer" className="hover:underline">
             View original
           </a>
+        )}
+        {post.cluster_hash && (
+          <>
+            {" · "}
+            <a
+              href={`/?cluster=${post.cluster_hash}`}
+              className="hover:underline"
+              style={{ color: "#f97316", fontFamily: "monospace", letterSpacing: "0.05em" }}
+            >
+              #{post.cluster_hash}
+            </a>
+          </>
         )}
       </p>
 

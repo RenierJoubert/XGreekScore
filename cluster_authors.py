@@ -1,3 +1,4 @@
+import hashlib
 import json
 import csv
 import sqlite3
@@ -17,6 +18,10 @@ CSV_OUT   = Path(__file__).parent / "authorship_clusters.csv"
 MIN_CLUSTER_SIZE = 4   
 MIN_SAMPLES      = 2   
 TOP_KEYWORDS     = 10 
+
+
+def make_hash(cluster_id: int) -> str:
+    return hashlib.sha256(str(cluster_id).encode()).hexdigest()[:8]
 
 
 def load_posts(db_path: Path) -> list[dict]:
@@ -138,6 +143,21 @@ def main() -> None:
     for c in sorted(clusters_out, key=lambda x: x["post_count"], reverse=True)[:10]:
         kw = ", ".join(c["keywords"][:5])
         print(f"  cluster {c['cluster_id']:3d}  {c['post_count']:4d} posts  [{kw}]")
+
+    print("\nWriting cluster assignments to DB …")
+    db_conn = sqlite3.connect(DB_PATH)
+    db_conn.execute("UPDATE posts SET cluster_id = -1, cluster_hash = NULL")
+    for label, indices in cluster_map.items():
+        if label < 0:
+            continue
+        h = make_hash(label)
+        db_conn.executemany(
+            "UPDATE posts SET cluster_id = ?, cluster_hash = ? WHERE id = ?",
+            [(label, h, posts[idx]["id"]) for idx in indices],
+        )
+    db_conn.commit()
+    db_conn.close()
+    print("  done")
 
 
 if __name__ == "__main__":
