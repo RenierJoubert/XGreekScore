@@ -4,7 +4,7 @@ import argparse
 from scraper import scrape_discussions
 
 DEFAULT_PAGES = 500
-DEFAULT_DB = ""
+DEFAULT_DB = "greekrank.db"
 
 
 def parse_args() -> argparse.Namespace:

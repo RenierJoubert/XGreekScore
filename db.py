@@ -10,7 +10,8 @@ def init_db(db_path: str) -> sqlite3.Connection:
             title   TEXT    NOT NULL,
             link    TEXT    UNIQUE NOT NULL,
             date    TEXT,
-            content TEXT
+            content TEXT,
+            deleted INTEGER DEFAULT 0
         );
 
         CREATE TABLE IF NOT EXISTS replies (
@@ -21,6 +22,10 @@ def init_db(db_path: str) -> sqlite3.Connection:
             content TEXT
         );
     """)
+    # Migrate existing DBs that predate the deleted column
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(posts)")}
+    if "deleted" not in cols:
+        conn.execute("ALTER TABLE posts ADD COLUMN deleted INTEGER DEFAULT 0")
     conn.commit()
     return conn
 
@@ -48,3 +53,37 @@ def insert_reply(conn: sqlite3.Connection, post_id: int, author: str, date: str,
         (post_id, author, date, content),
     )
     conn.commit()
+
+
+def mark_deleted_posts(conn: sqlite3.Connection, found_links: set[str]) -> tuple[int, int]:
+    """
+    Compares found_links against the DB to sync the deleted flag.
+    Posts absent from found_links are marked deleted=1.
+    Posts that reappeared (deleted=1 but present in found_links) are restored to deleted=0.
+    Returns (newly_deleted, restored).
+
+    Guard: if found_links has fewer than 50 entries the scrape likely failed
+    partway through, so this function is a no-op to avoid false positives.
+    """
+    if len(found_links) < 50:
+        print(f"  [deletion sweep] only {len(found_links)} links found — skipping to avoid false deletions")
+        return 0, 0
+
+    conn.execute("CREATE TEMP TABLE IF NOT EXISTS _seen_links (link TEXT PRIMARY KEY)")
+    conn.execute("DELETE FROM _seen_links")
+    conn.executemany("INSERT OR IGNORE INTO _seen_links VALUES (?)", [(l,) for l in found_links])
+
+    cur = conn.execute("""
+        UPDATE posts SET deleted = 1
+        WHERE link NOT IN (SELECT link FROM _seen_links) AND deleted = 0
+    """)
+    newly_deleted = cur.rowcount
+
+    cur = conn.execute("""
+        UPDATE posts SET deleted = 0
+        WHERE link IN (SELECT link FROM _seen_links) AND deleted = 1
+    """)
+    restored = cur.rowcount
+
+    conn.commit()
+    return newly_deleted, restored
