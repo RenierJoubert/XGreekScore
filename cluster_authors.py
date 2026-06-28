@@ -145,7 +145,8 @@ def main() -> None:
         print(f"  cluster {c['cluster_id']:3d}  {c['post_count']:4d} posts  [{kw}]")
 
     print("\nWriting cluster assignments to DB …")
-    db_conn = sqlite3.connect(DB_PATH)
+    from db import init_db
+    db_conn = init_db(str(DB_PATH))
     db_conn.execute("UPDATE posts SET cluster_id = -1, cluster_hash = NULL")
     for label, indices in cluster_map.items():
         if label < 0:
