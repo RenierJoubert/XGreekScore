@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 
 interface Post {
@@ -10,6 +11,8 @@ interface Post {
   content: string;
   reply_count: number;
   deleted: number;
+  cluster_id: number;
+  cluster_hash: string | null;
 }
 
 interface Result {
@@ -21,27 +24,37 @@ interface Result {
 
 const CARD_H = 220;
 
-export default function Home() {
-  const [query, setQuery] = useState("");
-  const [from, setFrom]   = useState("");
-  const [to, setTo]       = useState("");
+function HomeContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
-  const [posts, setPosts]         = useState<Post[]>([]);
-  const [total, setTotal]         = useState(0);
-  const [loading, setLoading]     = useState(false);
+  const [query, setQuery]     = useState("");
+  const [from, setFrom]       = useState("");
+  const [to, setTo]           = useState("");
+  const [cluster, setCluster] = useState(searchParams.get("cluster") ?? "");
+
+  const [posts, setPosts]     = useState<Post[]>([]);
+  const [total, setTotal]     = useState(0);
+  const [loading, setLoading] = useState(false);
 
   const pageRef     = useRef(1);
   const hasMoreRef  = useRef(true);
   const loadingRef  = useRef(false);
-  const sentinelRef = useRef<HTMLDivElement>(null);
 
-  // Store latest filter values in refs so the observer closure always sees them
-  const queryRef = useRef(query);
-  const fromRef  = useRef(from);
-  const toRef    = useRef(to);
-  useEffect(() => { queryRef.current = query; }, [query]);
-  useEffect(() => { fromRef.current  = from;  }, [from]);
-  useEffect(() => { toRef.current    = to;    }, [to]);
+  const queryRef   = useRef(query);
+  const fromRef    = useRef(from);
+  const toRef      = useRef(to);
+  const clusterRef = useRef(cluster);
+  useEffect(() => { queryRef.current   = query;   }, [query]);
+  useEffect(() => { fromRef.current    = from;    }, [from]);
+  useEffect(() => { toRef.current      = to;      }, [to]);
+  useEffect(() => { clusterRef.current = cluster; }, [cluster]);
+
+  // Sync cluster filter from URL (e.g. when navigating back from a post page)
+  useEffect(() => {
+    const c = searchParams.get("cluster") ?? "";
+    setCluster(c);
+  }, [searchParams]);
 
   const fetchPage = useCallback(async (pageNum: number, reset: boolean) => {
     if (loadingRef.current) return;
@@ -49,9 +62,10 @@ export default function Home() {
     setLoading(true);
 
     const params = new URLSearchParams();
-    if (queryRef.current) params.set("q", queryRef.current);
-    if (fromRef.current)  params.set("from", fromRef.current);
-    if (toRef.current)    params.set("to", toRef.current);
+    if (queryRef.current)   params.set("q",       queryRef.current);
+    if (fromRef.current)    params.set("from",     fromRef.current);
+    if (toRef.current)      params.set("to",       toRef.current);
+    if (clusterRef.current) params.set("cluster",  clusterRef.current);
     params.set("page", String(pageNum));
 
     try {
@@ -77,14 +91,12 @@ export default function Home() {
     }
   }, []);
 
-  // Reset and reload when filters change
   useEffect(() => {
     pageRef.current    = 1;
     hasMoreRef.current = true;
     fetchPage(1, true);
-  }, [query, from, to, fetchPage]);
+  }, [query, from, to, cluster, fetchPage]);
 
-  // Infinite scroll set to fire when user is within 600px of the bottom
   useEffect(() => {
     const onScroll = () => {
       const distFromBottom = document.documentElement.scrollHeight - window.scrollY - window.innerHeight;
@@ -95,6 +107,11 @@ export default function Home() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, [fetchPage]);
+
+  function clearCluster() {
+    setCluster("");
+    router.replace("/");
+  }
 
   return (
     <main style={{ minHeight: "100vh", background: "var(--light)", padding: "2.5rem 1.5rem" }}>
@@ -139,6 +156,31 @@ export default function Home() {
               fontSize: "0.75rem", outline: "none", colorScheme: "dark",
             }} value={to} onChange={e => setTo(e.target.value)} />
           </div>
+
+          {cluster && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: "0.5rem",
+              padding: "0.4rem 0.75rem",
+              border: "1px solid #f97316", borderRadius: "6px",
+            }}>
+              <span style={{ fontSize: "0.72rem", color: "var(--darkgray)", letterSpacing: "0.05em" }}>
+                posts by user
+              </span>
+              <code style={{ fontSize: "0.72rem", color: "#f97316", letterSpacing: "0.08em" }}>
+                {cluster}
+              </code>
+              <button
+                onClick={clearCluster}
+                style={{
+                  marginLeft: "auto", background: "none", border: "none",
+                  color: "var(--darkgray)", cursor: "pointer", fontSize: "0.85rem",
+                  lineHeight: 1, padding: "0 0.1rem",
+                }}
+              >
+                ×
+              </button>
+            </div>
+          )}
         </div>
 
         {total > 0 && (
@@ -199,15 +241,26 @@ export default function Home() {
                 }}>
                   {post.title}
                 </h2>
-                {post.deleted === 1 && (
-                  <span style={{
-                    fontSize: "0.6rem", fontWeight: 700, color: "#09090a",
-                    background: "#ef4444", padding: "0.1rem 0.4rem",
-                    borderRadius: "3px", letterSpacing: "0.08em", flexShrink: 0,
-                  }}>
-                    DELETED
-                  </span>
-                )}
+                <div style={{ display: "flex", gap: "0.3rem", flexShrink: 0 }}>
+                  {post.cluster_id >= 0 && (
+                    <span style={{
+                      fontSize: "0.6rem", fontWeight: 700, color: "#09090a",
+                      background: "#f97316", padding: "0.1rem 0.4rem",
+                      borderRadius: "3px", letterSpacing: "0.08em",
+                    }}>
+                      REGULAR
+                    </span>
+                  )}
+                  {post.deleted === 1 && (
+                    <span style={{
+                      fontSize: "0.6rem", fontWeight: 700, color: "#09090a",
+                      background: "#ef4444", padding: "0.1rem 0.4rem",
+                      borderRadius: "3px", letterSpacing: "0.08em",
+                    }}>
+                      DELETED
+                    </span>
+                  )}
+                </div>
               </div>
 
               <p style={{
@@ -234,8 +287,7 @@ export default function Home() {
         ))}
       </div>
 
-      {/* Sentinel — observer watches this to trigger next page */}
-      <div ref={sentinelRef} style={{ height: "1px", marginTop: "2rem" }} />
+      <div style={{ height: "1px", marginTop: "2rem" }} />
 
       {loading && (
         <p style={{
@@ -255,5 +307,13 @@ export default function Home() {
         </p>
       )}
     </main>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense>
+      <HomeContent />
+    </Suspense>
   );
 }

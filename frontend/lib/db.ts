@@ -21,6 +21,8 @@ export interface Post {
   content: string;
   reply_count: number;
   deleted: number;
+  cluster_id: number;
+  cluster_hash: string | null;
 }
 
 export interface Reply {
@@ -46,9 +48,10 @@ export function queryPosts(params: {
   from?: string;
   to?: string;
   page?: number;
+  cluster?: string;
 }): PostsResult {
   const db = getDb();
-  const { q, from, to, page = 1 } = params;
+  const { q, from, to, page = 1, cluster } = params;
   const offset = (page - 1) * PAGE_SIZE;
 
   const conditions: string[] = [];
@@ -65,6 +68,10 @@ export function queryPosts(params: {
   if (to) {
     conditions.push("p.date <= ?");
     args.push(to);
+  }
+  if (cluster) {
+    conditions.push("p.cluster_hash = ?");
+    args.push(cluster);
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";

@@ -6,12 +6,14 @@ def init_db(db_path: str) -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode=WAL")
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS posts (
-            id      INTEGER PRIMARY KEY AUTOINCREMENT,
-            title   TEXT    NOT NULL,
-            link    TEXT    UNIQUE NOT NULL,
-            date    TEXT,
-            content TEXT,
-            deleted INTEGER DEFAULT 0
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            title        TEXT    NOT NULL,
+            link         TEXT    UNIQUE NOT NULL,
+            date         TEXT,
+            content      TEXT,
+            deleted      INTEGER DEFAULT 0,
+            cluster_id   INTEGER DEFAULT -1,
+            cluster_hash TEXT
         );
 
         CREATE TABLE IF NOT EXISTS replies (
@@ -22,10 +24,13 @@ def init_db(db_path: str) -> sqlite3.Connection:
             content TEXT
         );
     """)
-    # Migrate existing DBs that predate the deleted column
     cols = {row[1] for row in conn.execute("PRAGMA table_info(posts)")}
     if "deleted" not in cols:
         conn.execute("ALTER TABLE posts ADD COLUMN deleted INTEGER DEFAULT 0")
+    if "cluster_id" not in cols:
+        conn.execute("ALTER TABLE posts ADD COLUMN cluster_id INTEGER DEFAULT -1")
+    if "cluster_hash" not in cols:
+        conn.execute("ALTER TABLE posts ADD COLUMN cluster_hash TEXT")
     conn.commit()
     return conn
 
