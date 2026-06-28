@@ -6,7 +6,7 @@ from playwright.async_api import async_playwright, TimeoutError as PWTimeout
 from utils import get_text, get_attr
 from db import init_db, insert_post, insert_reply, mark_deleted_posts
 
-BASE_URL = ""
+BASE_URL = "https://www.greekrank.net/uni/489/discussion/"
 
 CONCURRENCY = 5
 
