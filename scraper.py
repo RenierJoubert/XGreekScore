@@ -4,7 +4,7 @@ import random
 from playwright.async_api import async_playwright, TimeoutError as PWTimeout
 
 from utils import get_text, get_attr
-from db import init_db, insert_post, insert_reply
+from db import init_db, insert_post, insert_reply, mark_deleted_posts
 
 BASE_URL = ""
 
@@ -93,6 +93,7 @@ async def scrape_and_save(sem, browser, conn, title, link, idx):
 async def scrape_discussions(pages: int, db_path: str) -> None:
     conn = init_db(db_path)
     sem = asyncio.Semaphore(CONCURRENCY)
+    found_links: set[str] = set()
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
@@ -118,15 +119,20 @@ async def scrape_discussions(pages: int, db_path: str) -> None:
                 title = await get_text(a) if a else "No Title"
                 link = await get_attr(a, "href") if a else ""
                 if link and not link.startswith("http"):
-                    link = "" + link
+                    link = "https://www.greekrank.net" + link
                 if not link:
                     continue
+                found_links.add(link)
                 tasks.append(scrape_and_save(sem, browser, conn, title, link, idx))
 
             await asyncio.gather(*tasks)
             await asyncio.sleep(random.uniform(0.5, 1.5))
 
         await browser.close()
+
+    print(f"\n[Deletion sweep] {len(found_links)} links seen across {pages} pages")
+    newly_deleted, restored = mark_deleted_posts(conn, found_links)
+    print(f"  {newly_deleted} newly marked deleted, {restored} restored")
 
     conn.close()
     print(f"\nDone. Data saved to {db_path}")
