@@ -5,7 +5,6 @@ import "./globals.css";
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   weight: ["400", "500", "700"],
-  variable: "--font-jetbrains-mono",
 });
 
 export const metadata: Metadata = {
@@ -19,7 +18,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${jetbrainsMono.variable} h-full antialiased`}>
+    <html lang="en" className="h-full antialiased">
       <body className={`${jetbrainsMono.className} min-h-full flex flex-col`}>
         {children}
       </body>

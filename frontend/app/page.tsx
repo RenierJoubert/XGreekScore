@@ -2,180 +2,105 @@
 
 import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import Link from "next/link";
+import Image from "next/image";
+import type { Post, PostsResult } from "@/lib/db";
+import PostCard from "@/components/PostCard";
+import logo from "@/public/eye.png";
 
-interface Post {
-  id: number;
-  title: string;
-  date: string;
-  content: string;
-  reply_count: number;
-  deleted: number;
-  cluster_id: number;
-  cluster_hash: string | null;
-}
+const LOAD_MORE_DISTANCE_PX = 600;
 
-interface Result {
-  posts: Post[];
-  total: number;
-  page: number;
-  total_pages: number;
-}
-
-const CARD_H = 220;
+const dateInputClass =
+  "flex-1 border border-border bg-transparent px-3 py-2 text-xs text-secondary outline-none scheme-dark";
 
 function HomeContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const [query, setQuery]     = useState("");
-  const [from, setFrom]       = useState("");
-  const [to, setTo]           = useState("");
-  const [cluster, setCluster] = useState(searchParams.get("cluster") ?? "");
+  // TODO(comment): why the cluster filters live in the URL instead of state (they come from links on the post page)
+  const cluster = searchParams.get("cluster") ?? "";
+  const replyCluster = searchParams.get("reply_cluster") ?? "";
 
-  const [posts, setPosts]     = useState<Post[]>([]);
-  const [total, setTotal]     = useState(0);
+  const [query, setQuery] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  const hasMore = posts.length < total;
 
-  const pageRef     = useRef(1);
-  const hasMoreRef  = useRef(true);
-  const loadingRef  = useRef(false);
+  // TODO(comment): why these are refs and not state (the scroll listener needs the latest values immediately)
+  const pageRef = useRef(1);
+  const loadingRef = useRef(false);
 
-  const queryRef   = useRef(query);
-  const fromRef    = useRef(from);
-  const toRef      = useRef(to);
-  const clusterRef = useRef(cluster);
-  useEffect(() => { queryRef.current   = query;   }, [query]);
-  useEffect(() => { fromRef.current    = from;    }, [from]);
-  useEffect(() => { toRef.current      = to;      }, [to]);
-  useEffect(() => { clusterRef.current = cluster; }, [cluster]);
+  const fetchPage = useCallback(
+    async (pageNum: number) => {
+      if (loadingRef.current) return;
+      loadingRef.current = true;
+      setLoading(true);
 
-  // Sync cluster filter from URL (e.g. when navigating back from a post page)
-  useEffect(() => {
-    const c = searchParams.get("cluster") ?? "";
-    setCluster(c);
-  }, [searchParams]);
+      const filters = { q: query, from, to, cluster, reply_cluster: replyCluster, page: String(pageNum) };
+      const params = new URLSearchParams(Object.entries(filters).filter(([, value]) => value));
 
-  const fetchPage = useCallback(async (pageNum: number, reset: boolean) => {
-    if (loadingRef.current) return;
-    loadingRef.current = true;
-    setLoading(true);
-
-    const params = new URLSearchParams();
-    if (queryRef.current)   params.set("q",       queryRef.current);
-    if (fromRef.current)    params.set("from",     fromRef.current);
-    if (toRef.current)      params.set("to",       toRef.current);
-    if (clusterRef.current) params.set("cluster",  clusterRef.current);
-    params.set("page", String(pageNum));
-
-    try {
-      const res  = await fetch(`/api/posts?${params}`);
-      const data: Result = await res.json();
-
-      setPosts(prev => {
-        const combined = reset ? data.posts : [...prev, ...data.posts];
-        const seen = new Set<number>();
-        return combined.filter(p => {
-          if (seen.has(p.id)) return false;
-          seen.add(p.id);
-          return true;
-        });
-      });
-
-      setTotal(data.total);
-      pageRef.current    = pageNum;
-      hasMoreRef.current = pageNum < data.total_pages;
-    } finally {
-      loadingRef.current = false;
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    pageRef.current    = 1;
-    hasMoreRef.current = true;
-    fetchPage(1, true);
-  }, [query, from, to, cluster, fetchPage]);
-
-  useEffect(() => {
-    const onScroll = () => {
-      const distFromBottom = document.documentElement.scrollHeight - window.scrollY - window.innerHeight;
-      if (distFromBottom < 600 && hasMoreRef.current && !loadingRef.current) {
-        fetchPage(pageRef.current + 1, false);
+      try {
+        const res = await fetch(`/api/posts?${params}`);
+        const data: PostsResult = await res.json();
+        setPosts(prev => (pageNum === 1 ? data.posts : [...prev, ...data.posts]));
+        setTotal(data.total);
+        pageRef.current = pageNum;
+      } finally {
+        loadingRef.current = false;
+        setLoading(false);
       }
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    },
+    [query, from, to, cluster, replyCluster],
+  );
+
+  useEffect(() => {
+    fetchPage(1);
   }, [fetchPage]);
 
-  function clearCluster() {
-    setCluster("");
-    router.replace("/");
-  }
+  // TODO(comment): how infinite scroll works here (load the next page when near the bottom)
+  useEffect(() => {
+    function onScroll() {
+      const distanceFromBottom = document.documentElement.scrollHeight - window.scrollY - window.innerHeight;
+      if (hasMore && distanceFromBottom < LOAD_MORE_DISTANCE_PX) fetchPage(pageRef.current + 1);
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [fetchPage, hasMore]);
+
+  let status = "";
+  if (loading) status = "loading...";
+  else if (!hasMore && posts.length > 0) status = "— end —";
 
   return (
-    <main style={{ minHeight: "100vh", background: "var(--light)", padding: "2.5rem 1.5rem" }}>
-
-      {/* Header */}
-      <header style={{ maxWidth: "1400px", margin: "0 auto 2.5rem" }}>
-        <div style={{ textAlign: "center", marginBottom: "1.75rem" }}>
-          <img
-            src="/eye.png"
-            alt="XGreekScore"
-            style={{
-              height: "clamp(8rem, 5vw, 10rem)",
-              width: "auto",
-              display: "inline-block",
-              opacity: 0.9,
-            }}
-          />
+    <main className="min-h-screen bg-background px-6 py-10">
+      <header className="mx-auto mb-10 max-w-[1400px]">
+        <div className="mb-7 text-center">
+          <Image src={logo} alt="XGreekScore" className="inline-block h-32 w-auto opacity-90" />
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem", maxWidth: "700px", margin: "0 auto" }}>
+        <div className="mx-auto flex max-w-[700px] flex-col gap-2.5">
           <input
-            style={{
-              background: "transparent", border: "1px solid var(--gray)",
-              borderRadius: "6px", padding: "0.6rem 0.875rem",
-              color: "var(--tertiary)", fontSize: "0.8rem",
-              letterSpacing: "0.05em", width: "100%", outline: "none",
-            }}
+            className="w-full border border-border bg-transparent px-3.5 py-2.5 text-[0.8rem] tracking-[0.05em] text-foreground outline-none"
             placeholder="search posts..."
             value={query}
             onChange={e => setQuery(e.target.value)}
           />
-          <div style={{ display: "flex", gap: "0.625rem", alignItems: "center" }}>
-            <input type="date" style={{
-              flex: 1, background: "transparent", border: "1px solid var(--gray)",
-              borderRadius: "6px", padding: "0.5rem 0.75rem", color: "var(--dark)",
-              fontSize: "0.75rem", outline: "none", colorScheme: "dark",
-            }} value={from} onChange={e => setFrom(e.target.value)} />
-            <span style={{ color: "var(--darkgray)", fontSize: "0.75rem" }}>—</span>
-            <input type="date" style={{
-              flex: 1, background: "transparent", border: "1px solid var(--gray)",
-              borderRadius: "6px", padding: "0.5rem 0.75rem", color: "var(--dark)",
-              fontSize: "0.75rem", outline: "none", colorScheme: "dark",
-            }} value={to} onChange={e => setTo(e.target.value)} />
+          <div className="flex items-center gap-2.5">
+            <input type="date" className={dateInputClass} value={from} onChange={e => setFrom(e.target.value)} />
+            <span className="text-xs text-muted">—</span>
+            <input type="date" className={dateInputClass} value={to} onChange={e => setTo(e.target.value)} />
           </div>
 
-          {cluster && (
-            <div style={{
-              display: "flex", alignItems: "center", gap: "0.5rem",
-              padding: "0.4rem 0.75rem",
-              border: "1px solid #f97316", borderRadius: "6px",
-            }}>
-              <span style={{ fontSize: "0.72rem", color: "var(--darkgray)", letterSpacing: "0.05em" }}>
-                posts by user
-              </span>
-              <code style={{ fontSize: "0.72rem", color: "#f97316", letterSpacing: "0.08em" }}>
-                {cluster}
-              </code>
+          {(cluster || replyCluster) && (
+            <div className="flex items-center gap-2 border border-border px-3 py-1.5 text-[0.72rem]">
+              <span className="tracking-[0.05em] text-muted">posts about topic</span>
+              <span className="tracking-[0.08em] text-secondary">#{cluster || replyCluster}</span>
               <button
-                onClick={clearCluster}
-                style={{
-                  marginLeft: "auto", background: "none", border: "none",
-                  color: "var(--darkgray)", cursor: "pointer", fontSize: "0.85rem",
-                  lineHeight: 1, padding: "0 0.1rem",
-                }}
+                onClick={() => router.replace("/")}
+                className="ml-auto cursor-pointer px-0.5 text-[0.85rem] leading-none text-muted"
               >
                 ×
               </button>
@@ -184,127 +109,20 @@ function HomeContent() {
         </div>
 
         {total > 0 && (
-          <p style={{
-            textAlign: "center", marginTop: "1rem", fontSize: "0.7rem",
-            color: "var(--darkgray)", letterSpacing: "0.1em", textTransform: "uppercase",
-          }}>
+          <p className="mt-4 text-center text-[0.7rem] tracking-[0.1em] text-muted uppercase">
             {total.toLocaleString()} posts
           </p>
         )}
       </header>
 
-      {/* Grid */}
-      <div style={{
-        maxWidth: "1400px",
-        margin: "0 auto",
-        display: "grid",
-        gridTemplateColumns: "repeat(4, 1fr)",
-        gridAutoRows: `${CARD_H}px`,
-        border: "1px solid var(--gray)",
-        borderRadius: "10px",
-        overflow: "hidden",
-      }}>
+      <div className="mx-auto grid max-w-[1400px] auto-rows-[220px] grid-cols-4 gap-2">
         {posts.map(post => (
-          <Link
-            key={post.id}
-            href={`/posts/${post.id}`}
-            style={{
-              textDecoration: "none",
-              display: "block",
-              overflow: "hidden",
-              borderRight: "1px solid var(--gray)",
-              borderBottom: "1px solid var(--gray)",
-            }}
-          >
-            <article
-              style={{
-                background: "var(--light)",
-                padding: "1.125rem",
-                height: `${CARD_H}px`,
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.5rem",
-                overflow: "hidden",
-                transition: "background 0.15s",
-                cursor: "pointer",
-                boxSizing: "border-box",
-              }}
-              onMouseEnter={e => (e.currentTarget.style.background = "#111113")}
-              onMouseLeave={e => (e.currentTarget.style.background = "var(--light)")}
-            >
-              <div style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", flexShrink: 0 }}>
-                <h2 style={{
-                  fontSize: "0.8rem", fontWeight: 500, color: "var(--tertiary)",
-                  lineHeight: 1.4, margin: 0, flex: 1, letterSpacing: "0.02em",
-                  overflow: "hidden", display: "-webkit-box",
-                  WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
-                }}>
-                  {post.title}
-                </h2>
-                <div style={{ display: "flex", gap: "0.3rem", flexShrink: 0 }}>
-                  {post.cluster_id >= 0 && (
-                    <span style={{
-                      fontSize: "0.6rem", fontWeight: 700, color: "#09090a",
-                      background: "#f97316", padding: "0.1rem 0.4rem",
-                      borderRadius: "3px", letterSpacing: "0.08em",
-                    }}>
-                      REGULAR
-                    </span>
-                  )}
-                  {post.deleted === 1 && (
-                    <span style={{
-                      fontSize: "0.6rem", fontWeight: 700, color: "#09090a",
-                      background: "#ef4444", padding: "0.1rem 0.4rem",
-                      borderRadius: "3px", letterSpacing: "0.08em",
-                    }}>
-                      DELETED
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <p style={{
-                fontSize: "0.72rem", color: "var(--dark)", lineHeight: 1.55,
-                margin: 0, flex: 1, overflow: "hidden",
-                display: "-webkit-box", WebkitLineClamp: 5, WebkitBoxOrient: "vertical",
-              }}>
-                {post.content}
-              </p>
-
-              <div style={{
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-                flexShrink: 0, paddingTop: "0.5rem", borderTop: "1px solid var(--highlight)",
-              }}>
-                <span style={{ fontSize: "0.75rem", color: "var(--darkgray)", letterSpacing: "0.04em" }}>
-                  {post.date?.slice(0, 10)}
-                </span>
-                <span style={{ fontSize: "0.75rem", color: "var(--darkgray)", letterSpacing: "0.04em" }}>
-                  {post.reply_count} {post.reply_count === 1 ? "reply" : "replies"}
-                </span>
-              </div>
-            </article>
-          </Link>
+          <PostCard key={post.id} post={post} />
         ))}
       </div>
 
-      <div style={{ height: "1px", marginTop: "2rem" }} />
-
-      {loading && (
-        <p style={{
-          textAlign: "center", marginTop: "2rem", fontSize: "0.7rem",
-          color: "var(--darkgray)", letterSpacing: "0.12em", textTransform: "uppercase",
-        }}>
-          loading...
-        </p>
-      )}
-
-      {!hasMoreRef.current && posts.length > 0 && !loading && (
-        <p style={{
-          textAlign: "center", marginTop: "2rem", fontSize: "0.7rem",
-          color: "var(--darkgray)", letterSpacing: "0.12em", textTransform: "uppercase",
-        }}>
-          — end —
-        </p>
+      {status && (
+        <p className="mt-8 text-center text-[0.7rem] tracking-[0.12em] text-muted uppercase">{status}</p>
       )}
     </main>
   );
