@@ -11,3 +11,4 @@ frontend/.next/
 CLAUDE.md
 authorship_clusters.*
 logs/
+*.bak*

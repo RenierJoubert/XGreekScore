@@ -1,6 +1,5 @@
 @import "tailwindcss";
 
-/* TODO(comment): what each colour role is for (these become classes like bg-background, text-muted) */
 @theme {
   --color-background: #000000;
   --color-card-hover: #111113;
