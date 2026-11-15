@@ -8,7 +8,7 @@ DEFAULT_DB = "greekrank.db"
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Scrape GreekRank discussions into SQLite.")
+    parser = argparse.ArgumentParser(description="Scrape discussions into SQLite.")
     parser.add_argument(
         "--pages",
         type=int,
@@ -19,12 +19,12 @@ def parse_args() -> argparse.Namespace:
         "--db",
         type=str,
         default=DEFAULT_DB,
-        help=f"Path to the SQLite database file (default: {DEFAULT_DB})",
+        help=f"Path to the SQLite db (default: {DEFAULT_DB})",
     )
     parser.add_argument(
         "--sweep",
         action="store_true",
-        help="After scraping, mark posts absent from the listing as deleted. Only reliable on a full scrape.",
+        help="Mark absent posts as deleted. Only valid after a full cycle",
     )
     return parser.parse_args()
 

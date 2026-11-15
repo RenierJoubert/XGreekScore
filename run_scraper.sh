@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Runs and passes arguments to the scraper, keeps a dated output log
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
