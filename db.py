@@ -78,7 +78,7 @@ def mark_deleted_posts(
     """)
     newly_deleted = cur.rowcount
 
-    # if an old post was deleted by is in the new set, it wasnt deleted
+    # if an old post was deleted but is in the new set, it wasnt deleted
     cur = conn.execute("""
         UPDATE posts SET deleted = 0
         WHERE link IN (SELECT link FROM _seen_links) AND deleted = 1

@@ -34,7 +34,7 @@ def build_text(post: dict) -> str:
     return f"{title}. {content}" if title else content
 
 
-# Given texts of a specific topic, return the kewords using TF-IDF
+# Given texts of a specific topic, return the keywords using TF-IDF
 # (term frequency * inverse document frequency)
 def extract_keywords(texts: list[str], n: int = TOP_KEYWORDS) -> list[str]:
     if len(texts) < 2:

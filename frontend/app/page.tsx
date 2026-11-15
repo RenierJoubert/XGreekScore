@@ -16,7 +16,6 @@ function HomeContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  // TODO(comment): why the cluster filters live in the URL instead of state (they come from links on the post page)
   const cluster = searchParams.get("cluster") ?? "";
   const replyCluster = searchParams.get("reply_cluster") ?? "";
 
@@ -29,7 +28,6 @@ function HomeContent() {
   const [loading, setLoading] = useState(false);
   const hasMore = posts.length < total;
 
-  // TODO(comment): why these are refs and not state (the scroll listener needs the latest values immediately)
   const pageRef = useRef(1);
   const loadingRef = useRef(false);
 
@@ -60,7 +58,7 @@ function HomeContent() {
     fetchPage(1);
   }, [fetchPage]);
 
-  // TODO(comment): how infinite scroll works here (load the next page when near the bottom)
+  // Load the next page when we are near the bottom
   useEffect(() => {
     function onScroll() {
       const distanceFromBottom = document.documentElement.scrollHeight - window.scrollY - window.innerHeight;

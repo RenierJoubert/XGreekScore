@@ -2,7 +2,6 @@ import Link from "next/link";
 import { getPost } from "@/lib/db";
 import PostBadges from "@/components/PostBadges";
 
-// TODO(comment): why this page must render on every request (the database changes after each scrape)
 export const dynamic = "force-dynamic";
 
 function ClusterLink({ param, hash }: { param: "cluster" | "reply_cluster"; hash: string }) {

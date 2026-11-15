@@ -7,8 +7,6 @@ __pycache__/
 mnt/
 frontend/node_modules/
 frontend/.next/
-.claude
-CLAUDE.md
 authorship_clusters.*
 logs/
-*.bak*
+*.bak

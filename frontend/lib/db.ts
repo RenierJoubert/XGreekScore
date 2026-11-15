@@ -1,12 +1,11 @@
 import Database from "better-sqlite3";
 import path from "path";
 
-// TODO(comment): why this path only works when the server is started from inside frontend/
+// When we start up the server from inside /frontend we get the right db path
 const DB_PATH = path.resolve(process.cwd(), "../greekrank.db");
 
 let _db: Database.Database | null = null;
 
-// TODO(comment): why one shared read-only connection (the scraper is the only writer)
 export function getDb(): Database.Database {
   if (!_db) {
     _db = new Database(DB_PATH, { readonly: true });
@@ -45,7 +44,7 @@ export interface PostsResult {
 
 const PAGE_SIZE = 20;
 
-// TODO(comment): what each filter does, and that they combine with AND
+// The search functionality of the site
 export function queryPosts(params: {
   q?: string;
   from?: string;
@@ -70,7 +69,7 @@ export function queryPosts(params: {
     args.push(from);
   }
   if (to) {
-    conditions.push("p.date < date(?, '+1 day')");
+    conditions.push("p.date <= ?");
     args.push(to);
   }
   if (cluster) {
@@ -88,7 +87,7 @@ export function queryPosts(params: {
     db.prepare(`SELECT COUNT(*) as n FROM posts p ${where}`).get(...args) as { n: number }
   ).n;
 
-  // TODO(comment): why p.id is in the ORDER BY (posts with the same timestamp would otherwise shuffle between pages)
+  // Fetch one page of results (up to 20) with newest posts first
   const posts = db.prepare(
     `SELECT p.*, COUNT(r.id) as reply_count
      FROM posts p

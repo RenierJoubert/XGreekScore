@@ -13,7 +13,7 @@ CONCURRENCY = 5
 # Tells the scraper to stop after 3 empty pages
 EMPTY_PAGE_LIMIT = 3
 
-# TODO(comment): why cap the number of reply pages per post (a backstop, so a site quirk can't loop forever)
+# In case the site is stuck in a loop
 MAX_REPLY_PAGES = 50
 
 
@@ -76,7 +76,7 @@ async def extract_replies(page) -> list[dict]:
         replies.append({"author": author, "date": date, "content": content})
     return replies
 
-# Does the given page contain a link to the inpur url
+# Does the given page contain a link to the input url
 async def has_link_to(page, url: str) -> bool:
     return await page.evaluate("url => [...document.links].some(a => a.href === url)", url)
 
@@ -101,7 +101,7 @@ async def scrape_post_page(browser, link: str) -> tuple[str, str, list[dict]]:
         page_num = 1
         while page_num < MAX_REPLY_PAGES:
             next_url = urljoin(link, f"page-{page_num + 1}/")
-            # Have we gone though all the pages
+            # Have we gone through all the pages
             if not await has_link_to(page, next_url):
                 break
             page_num += 1
@@ -131,7 +131,6 @@ async def scrape_and_save(sem, browser, conn, title, link):
             insert_reply(conn, post_id, reply["author"], reply["date"], reply["content"])
 
 
-# TODO(comment): docstring — what one run does, and what `pages` and `sweep` control
 async def scrape_discussions(pages: int, db_path: str, sweep: bool = False) -> None:
    
     # link db, initialize semaphore with desired concurrency, initialize empty set of new urls
@@ -155,7 +154,7 @@ async def scrape_discussions(pages: int, db_path: str, sweep: bool = False) -> N
             try:
                 await listing_page.goto(url, timeout=60_000, wait_until="domcontentloaded")
             except Exception as e:
-                print(f"failed to load listing page {page_num}: {e})")
+                print(f"failed to load listing page {page_num}: {e}")
                 break
             
             # boxes = every post on the current page
@@ -171,7 +170,7 @@ async def scrape_discussions(pages: int, db_path: str, sweep: bool = False) -> N
                 continue
 
             consecutive_empty = 0
-            print(f"Found {len(boxes)} scraping {CONCURRENCY} at a time")
+            print(f"Found {len(boxes)} posts, scraping {CONCURRENCY} at a time")
 
             # For each listing page, each post is a task
             tasks = []
